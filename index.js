@@ -148,6 +148,9 @@ export default class SvgImage extends Component{
                 }
             }
         }
+        if (this.props.fill) {
+            attrs = Object.assign({}, attrs, { fill: this.props.fill });
+        } 
         return attrs
     }
 
