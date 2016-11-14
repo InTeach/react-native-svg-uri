@@ -37,21 +37,32 @@ export default class SvgImage extends Component{
         super(props);
 
         this.state = {svgXmlData:null};
-
+        let responseXML; 
+        let isComponentMounted = false;
         if (props.source) {
             const source = resolveAssetSource(props.source) || {};
             this.fecthSVGData(source.uri);
         }
+    }
+    componentWillMount() {
+      this.isComponentMounted = true;
+    }
+    componentWillUnmount() {
+      this.isComponentMounted = false
     }
 
     fecthSVGData=async (uri)=>{
         try {
             let response = await fetch(uri);
             let responseXML = await response.text();
-            this.setState({svgXmlData:responseXML});
-            return responseXML;
+            this.responseXML = responseXML
+            
         } catch(error) {
             console.error(error);
+        } finally {
+          if (this.isComponentMounted) {
+            this.setState({svgXmlData:this.responseXML});
+          }          
         }
     }
 
