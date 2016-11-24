@@ -21,7 +21,7 @@ import Svg,{
     Stop
 } from 'react-native-svg';
 
-
+import _ from 'lodash'
 // Attributes that only change his name
 const ATTS_TRANSFORMED_NAMES={'stroke-linejoin':'strokeLinejoin',
     'stroke-linecap':'strokeLinecap',
@@ -31,48 +31,85 @@ const ATTS_TRANSFORMED_NAMES={'stroke-linejoin':'strokeLinejoin',
 
 let ind = 1;
 
+const FETCHED_SVG = [];
 export default class SvgImage extends Component{
 
     constructor(props){
         super(props);
 
-        this.state = {svgXmlData:null};
+        this.state = {svgXmlData:null, svg: null};
         let responseXML; 
         let isComponentMounted = false;
-        if (props.source) {
-            const source = resolveAssetSource(props.source) || {};
-            this.fecthSVGData(source.uri);
-        }
+        
     }
     componentWillMount() {
+      const hash = JSON.stringify(this.props)
+      if (this.props.source) {
+          const source = resolveAssetSource(this.props.source) || {};
+          if(FETCHED_SVG[hash]){
+            this.setState({svg: FETCHED_SVG[hash]})
+          } else {
+            this.testFetch(source.uri).then(svgXmlData => {
+              let svg = this.createSVG(svgXmlData);
+              FETCHED_SVG[hash] = svg;
+              this.setState({svg})  
+            });
+            
+          }          
+      }
       this.isComponentMounted = true;
+      
     }
     componentWillUnmount() {
       this.isComponentMounted = false
     }
-
+    createSVG(svgXmlData) {
+      let inputSVG = svgXmlData.substring(svgXmlData.indexOf("<svg "), (svgXmlData.indexOf("</svg>") + 6));
+      let doc = new xmldom.DOMParser().parseFromString(inputSVG);
+      let rootSVG = this.inspectNode(doc.childNodes[0]);
+      return rootSVG
+    }
+    testFetch(uri) {
+      return fetch(uri).then(response => {
+        return response.text().then(result => {
+          return result
+        })
+      })
+    }
     fecthSVGData=async (uri)=>{
-        try {
-            let response = await fetch(uri);
-            let responseXML = await response.text();
-            this.responseXML = responseXML
-            
-        } catch(error) {
-            console.error(error);
-        } finally {
-          if (this.isComponentMounted) {
-            this.setState({svgXmlData:this.responseXML});
-          }          
-        }
+
+      try {
+          let response = await fetch(uri);
+          let responseXML = await response.text();
+          this.responseXML = responseXML
+          return responseXML;
+      } catch(error) {
+          console.error(error);
+      } finally {
+        //if (this.isComponentMounted) {
+          //FETCHED_SVG[uri] = this.responseXML
+          //this.setState({svgXmlData:this.responseXML});
+          return this.responseXML
+        //}          
+      }
     }
 
     componentWillReceiveProps (nextProps){
-        if (nextProps.source) {
-            const source = resolveAssetSource(nextProps.source) || {};
-            const oldSource = resolveAssetSource(this.props.source) || {};
-            if(source.uri !== oldSource.uri){
-                this.fecthSVGData(source.uri);
-            }
+        if(!_.isEqual(nextProps, this.props)){
+          const hash = JSON.stringify(nextProps)
+          if (nextProps.source) {
+          const source = resolveAssetSource(nextProps.source) || {};
+          if(FETCHED_SVG[hash]){
+            this.setState({svg: FETCHED_SVG[hash]})
+          } else {
+            this.testFetch(source.uri).then(svgXmlData => {
+              let svg = this.createSVG(svgXmlData);
+              FETCHED_SVG[hash] = svg;
+              this.setState({svg})  
+            });
+            
+          }          
+      }
         }
     }
 
@@ -172,19 +209,13 @@ export default class SvgImage extends Component{
       this._root.setNativeProps(nativeProps);
     }
     render(){
+      
         try{
-            if (this.state.svgXmlData == null)
+            if (this.state.svg == null)
                 return null;
-
-            let inputSVG = this.state.svgXmlData.substring(this.state.svgXmlData.indexOf("<svg "), (this.state.svgXmlData.indexOf("</svg>") + 6));
-
-            let doc = new xmldom.DOMParser().parseFromString(inputSVG);
-
-            let rootSVG = this.inspectNode(doc.childNodes[0]);
-
             return(
                 <View style={this.props.style} ref={component => this._root = component}>
-                    {rootSVG}
+                    {this.state.svg}
                 </View>
             );
         }catch(e){
