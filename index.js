@@ -56,17 +56,27 @@ export default class SvgImage extends Component{
             });
             
           }          
+      } else {
+        if(this.props.data){
+          if(FETCHED_SVG[hash]){
+            this.setState({svg: FETCHED_SVG[hash]})
+          } else {
+            let svg = this.createSVG(this.props.data);
+            FETCHED_SVG[hash] = svg;
+            this.setState({svg})
+          }
+        }
       }
-      this.isComponentMounted = true;
-      
+      this.isComponentMounted = true;      
     }
+
     componentWillUnmount() {
       this.isComponentMounted = false
     }
-    createSVG(svgXmlData) {
+    createSVG(svgXmlData, nextFill = '') {
       let inputSVG = svgXmlData.substring(svgXmlData.indexOf("<svg "), (svgXmlData.indexOf("</svg>") + 6));
       let doc = new xmldom.DOMParser().parseFromString(inputSVG);
-      let rootSVG = this.inspectNode(doc.childNodes[0]);
+      let rootSVG = this.inspectNode(doc.childNodes[0], nextFill);
       return rootSVG
     }
     testFetch(uri) {
@@ -98,56 +108,65 @@ export default class SvgImage extends Component{
         if(!_.isEqual(nextProps, this.props)){
           const hash = JSON.stringify(nextProps)
           if (nextProps.source) {
-          const source = resolveAssetSource(nextProps.source) || {};
-          if(FETCHED_SVG[hash]){
-            this.setState({svg: FETCHED_SVG[hash]})
-          } else {
-            this.testFetch(source.uri).then(svgXmlData => {
-              let svg = this.createSVG(svgXmlData);
+            const source = resolveAssetSource(nextProps.source) || {};
+            if(FETCHED_SVG[hash]){
+              this.setState({svg: FETCHED_SVG[hash]})
+            } else {
+              this.testFetch(source.uri).then(svgXmlData => {
+                let svg = this.createSVG(svgXmlData);
+                FETCHED_SVG[hash] = svg;
+                this.setState({svg})  
+              });
+              
+            }          
+          }else {
+            if(FETCHED_SVG[hash]){
+              this.setState({svg: FETCHED_SVG[hash]})
+            } else {
+              let svg = this.createSVG(nextProps.data, nextProps.fill);
               FETCHED_SVG[hash] = svg;
-              this.setState({svg})  
-            });
+              this.setState({svg})    
+            }
             
-          }          
-      }
+          }
         }
     }
 
 
-    createSVGElement=(node, childs)=>{
+    createSVGElement=(node, childs, nextFill = '')=>{
         let componentAtts = {};
         let i = ind++;
         switch (node.nodeName) {
             case 'svg':
-                componentAtts = this._getAttributes(node);
+                componentAtts = this._getAttributes(node, nextFill);
                 if (this.props.width)
                     componentAtts.width = this.props.width;
                 if (this.props.height)
                     componentAtts.height = this.props.height;
                 return <Svg  key={i} {...componentAtts}>{childs}</Svg>;
             case 'g':
-                componentAtts = this._getAttributes(node);
+                componentAtts = this._getAttributes(node, nextFill);
                 return <G key={i} {...componentAtts}>{childs}</G>;
             case 'path':
-                componentAtts = this._getAttributes(node);
+                componentAtts = this._getAttributes(node, nextFill);
                 return <Path  key={i} {...componentAtts}>{childs}</Path>;
             case 'circle':
-                componentAtts = this._getAttributes(node);
+                componentAtts = this._getAttributes(node, nextFill);
                 return <Circle key={i} {...componentAtts}>{childs}</Circle>;
             case 'rect':
-                componentAtts = this._getAttributes(node);
+                componentAtts = this._getAttributes(node, nextFill);
                 return <Rect key={i} {...componentAtts}>{childs}</Rect>;
             case 'linearGradient':
-                componentAtts = this._getAttributes(node);
+                componentAtts = this._getAttributes(node, nextFill);
                 return <Defs key={i}><LinearGradient  {...componentAtts}>{childs}</LinearGradient></Defs>;
             case 'radialGradient':
-                componentAtts = this._getAttributes(node);
+                componentAtts = this._getAttributes(node, nextFill);
                 return <Defs key={i}><RadialGradient  {...componentAtts}>{childs}</RadialGradient></Defs>;
             case 'stop':
-                componentAtts = this._getAttributes(node);
+                componentAtts = this._getAttributes(node, nextFill);
                 return <Stop key={i} {...componentAtts}>{childs}</Stop>;
             case 'polygon':
-                componentAtts = this._getAttributes(node);
+                componentAtts = this._getAttributes(node, nextFill);
                 return <Polygon key={i} {...componentAtts}>{childs}</Polygon>;
             default:
                 return null;
@@ -156,7 +175,7 @@ export default class SvgImage extends Component{
     }
 
 
-    _getAttributes = (node)=>{
+    _getAttributes = (node, nextFill = '')=>{
         let attrs = {}
         for (let i = 0; i < node.attributes.length; i++){
             let att = node.attributes[i]
@@ -185,24 +204,29 @@ export default class SvgImage extends Component{
                 }
             }
         }
-        if (this.props.fill) {
-            attrs = Object.assign({}, attrs, { fill: this.props.fill });
-        } 
+        if(nextFill !== ''){
+          attrs = Object.assign({}, attrs, { fill: nextFill });
+        }else {
+          if (this.props.fill) {
+             attrs = Object.assign({}, attrs, { fill: this.props.fill });
+          } 
+        }
+        
         return attrs
     }
 
 
-    inspectNode=(node)=>{
+    inspectNode=(node, nextFill = '')=>{
         //Process the xml node
         let arrayElements = [];
         if (node.childNodes && node.childNodes.length > 0){
             for (let i = 0; i < node.childNodes.length; i++){
-                let nodo = this.inspectNode(node.childNodes[i]);
+                let nodo = this.inspectNode(node.childNodes[i], nextFill);
                 if (nodo != null)
                     arrayElements.push(nodo);
             }
         }
-        let element = this.createSVGElement(node, arrayElements);
+        let element = this.createSVGElement(node, arrayElements, nextFill);
         return element;
     }
     setNativeProps(nativeProps) {
